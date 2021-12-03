@@ -6,23 +6,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
     <style>
-    #mario{
-        width:40px;
-        position:fixed;
-        transform: translate(-20px, -53px);
-        transform-origin: 20px 53px;
-    }
-    #mariojump{
-        width:56px;
-        position:fixed;
-        display: none
-    }
-    #goomba{
-        width:25px;
-        position:fixed;
-        transform: translate(-12px, -25px);
-        transform-origin: 12px 25px;
-    }
+        body {margin: 0;}
+        #mario{
+            width:40px;
+            position:fixed;
+            transform: translate(-20px, -53px);
+            transform-origin: 20px 53px;
+        }
+        #mariojump{
+            width:56px;
+            position:fixed;
+            display: none
+        }
+        #goomba{
+            width:25px;
+            position:fixed;
+            transform: translate(-12px, -25px);
+            transform-origin: 12px 25px;
+        }
      </style>
 </head>
 <body>
@@ -32,49 +33,93 @@
 
     
     <script>
-        let mario = {
-            x: 450,
-            y: 150,
-            w: 36,
-            h: 53,
-            speed: 4,
-            direction: 0, //-1 left, 0 still, 1 right
-            isDead: false
-        }
-        let goomba = {
-            x: 250,
-            y: 150,
-            w: 22,
-            h: 25,
-        }
         let marioSprite = document.getElementById("mario")
         marioSprite.myOffset = [20,53]
         let mariojumpSprite = document.getElementById("mariojump")
         let goombaSprite = document.getElementById("goomba")
         goombaSprite.myOffset = [12,25]
 
+        const gravity = 1
+        let mario = {
+            x: 450,
+            y: 150,
+            width: 36,
+            height: 53,
+            speedX: 4,
+            speedY: 0,
+            jumpStrength: 11,
+            jumpCounter: 0,
+            jumpMax: 2,
+            direction: 0, //-1 left, 0 still, 1 right
+            isDead: false,
+            currentSprite: marioSprite,
+        }
+        let goomba = {
+            x: 250,
+            y: 150,
+            width: 26,
+            height: 25,
+            currentSprite: goombaSprite,
+        }
+
         setSpritePos(marioSprite, mario.x, mario.y)
         setSpritePos(goombaSprite, goomba.x, goomba.y)
 
+        let debugCrosses = [
+            addDebugCross(),
+            addDebugCross(),
+            addDebugCross(),
+            addDebugCross(),
+            addDebugCross(),
+        ]
 
+            // Saab WAD ja Nooltega liikuda
         window.onkeydown = function (e) {
-            if(e.keyCode == 37) {
-                mario.direction = -1
-            } else if(e.keyCode == 39) {
-                mario.direction = 1
+            switch(e.keyCode) {
+                case 65:
+                case 37: mario.direction = -1; break;
+                case 68:
+                case 39: mario.direction = 1; break;
+                case 87:
+                case 38: {
+                    if(mario.jumpCounter < 2) {
+                        mario.speedY = -mario.jumpStrength;
+                        mario.jumpCounter++ // Kui mario jumpcounter on alla 2 siis saab jumpida ja kui on suurem kui 2 siis ei saa
+                    }
+                    break;
+                }
+                default: console.log(e.keyCode)
             }
         };
 
-        setInterval(function() {
+        setInterval(function() { // arvutab 30fps sekundis
             if (mario.isDead) return;
+            
+            mario.x+=mario.speedX*mario.direction
+            mario.y += mario.speedY
+            setSpritePos(marioSprite, mario.x, mario.y, 0 , mario.direction || 1)      // || on OR
 
-            mario.x+=mario.speed*mario.direction
-            setSpritePos(marioSprite, mario.x, mario.y, 0 , mario.direction || 1)
+            // debug mario bounding box
+            debugCrosses[0].set(mario.x-mario.w/2, mario.y-mario.h/2)
+            debugCrosses[1].set(mario.x+mario.w/2, mario.y+mario.h/2)
+            debugCrosses[2].set(mario.x, mario.y)
+            debugCrosses[3].set(goomba.x-goomba.w/2, goomba.y-goomba.h/2)
+            debugCrosses[4].set(goomba.x+goomba.w/2, goomba.y+goomba.h/2)
 
-            if (detectCollision(mario, goomba)) {
+            // Kas on õhus
+            if(mario.y+mario.speedY < 150) {
+                mario.speedY+=gravity // on õhus apply gravity
+            } else {
+                // tagasi põrandal
+                mario.y=150
+                mario.speedY = 0
+                mario.jumpCounter = 0
+            }
+                // detectib collisionit goombaga 
+            if (detectCollision(mario.currentSprite.getBoundingClientRect(), goomba.currentSprite.getBoundingClientRect())) {
                 mario.isDead = true
             }
-
+                // Kui on surnud siis kukub 
             if (mario.isDead) {
                 console.log("test")
                 setSpritePos(marioSprite, mario.x, mario.y, 90*mario.direction, mario.direction || 1)
@@ -85,14 +130,26 @@
         function setSpritePos(spr, x, y, rot=0, scaleX=1) {
             spr.style.top=y+"px"
             spr.style.left=x+"px"
-            spr.style.transform=`translate(-${spr.myOffset[0]}px, -${spr.myOffset[1]}px) rotate(${rot}deg) scaleX(${scaleX})`
+            spr.style.transform=`translate(-${spr.myOffset[0]}px, -${spr.myOffset[1]}px) rotate(${rot}deg) scaleX(${scaleX})` // Template literal ` lubab panna muutajaid
+        }
+            // detectib kas on 2 ristkülikut
+        function detectCollision(rect1, rect2) {
+            return rect1.left < rect2.right && rect1.right > rect2.left && rect1.bottom > rect2.top && rect1.top < rect2.bottom
         }
 
-        function detectCollision(rect1, rect2) {
-            return (rect1.x < rect2.x + rect2.w &&
-                rect1.x + rect1.w > rect2.x &&
-                rect1.y < rect2.y + rect2.h &&
-                rect1.h + rect1.y > rect2.y)
+        function addDebugCross(x=0,y=0) {
+            let cross = document.createElement("img")
+            cross.src = "cross.png"
+            cross.style.position="fixed"
+            cross.style.transform="translate(-16px,-16px)"
+            let state = {}
+            state.set = (x, y) => {
+                cross.style.top=y+"px"
+                cross.style.left=x+"px"
+            }
+            state.set(x,y)
+            document.body.append(cross)
+            return state;
         }
     </script>
 </body>
